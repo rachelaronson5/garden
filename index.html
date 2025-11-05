@@ -9,67 +9,72 @@
 <body style="margin:0; overflow:hidden;">
 
 <a-scene
+  embedded
   xr-mode-ui="enabled: true"
   webxr="optionalFeatures: hit-test; referenceSpaceType: local-floor"
-  embedded
 >
   <!-- Camera -->
   <a-entity camera look-controls position="0 1.6 0"></a-entity>
 
-  <!-- 3D Models as empty entities to be positioned -->
+  <!-- Models start invisible -->
   <a-entity id="tree" gltf-model="tree.gltf" scale="0.5 0.5 0.5" visible="false"></a-entity>
   <a-entity id="jungleGym" gltf-model="jungleGym.glb" scale="0.02 0.02 0.02" visible="false"></a-entity>
   <a-entity id="flowers" gltf-model="flowers.glb" scale="0.05 0.05 0.05" visible="false"></a-entity>
 
   <a-entity light="type: ambient; intensity: 1"></a-entity>
   <a-entity light="type: directional; intensity: 0.6" position="0 1 1"></a-entity>
-
 </a-scene>
 
 <script>
-  const sceneEl = document.querySelector('a-scene');
   const tree = document.querySelector('#tree');
   const jungleGym = document.querySelector('#jungleGym');
   const flowers = document.querySelector('#flowers');
+  const scene = document.querySelector('a-scene');
 
   let hitTestSource = null;
-  let localReferenceSpace = null;
+  let xrRefSpace = null;
 
-  sceneEl.addEventListener('enter-vr', async () => {
-    const xrSession = sceneEl.xrSession;
-    if (!xrSession) return;
+  scene.addEventListener('enter-vr', async () => {
+    if (navigator.xr) {
+      const session = await navigator.xr.requestSession('immersive-ar', { optionalFeatures: ['hit-test'] });
+      scene.renderer.xr.setSession(session);
 
-    localReferenceSpace = await xrSession.requestReferenceSpace('local-floor');
-    hitTestSource = await xrSession.requestHitTestSource({ space: localReferenceSpace });
+      xrRefSpace = await session.requestReferenceSpace('local-floor');
+      const viewerSpace = await session.requestReferenceSpace('viewer');
+      hitTestSource = await session.requestHitTestSource({ space: viewerSpace });
 
-    // Listen for user tapping to place objects
-    xrSession.addEventListener('select', (event) => {
-      const hitResults = event.frame.getHitTestResults(hitTestSource);
-      if (hitResults.length > 0) {
-        const hitPose = hitResults[0].getPose(localReferenceSpace);
+      session.addEventListener('select', (event) => {
+        const frame = event.frame;
+        const hitResults = frame.getHitTestResults(hitTestSource);
 
-        // Place the tree at first tap
-        if (!tree.getAttribute('visible')) {
-          tree.setAttribute('position', `${hitPose.transform.position.x} ${hitPose.transform.position.y} ${hitPose.transform.position.z}`);
-          tree.setAttribute('visible', true);
-          return;
+        if (hitResults.length > 0) {
+          const hitPose = hitResults[0].getPose(xrRefSpace);
+
+          // Place tree first
+          if (!tree.getAttribute('visible')) {
+            tree.setAttribute('position', `${hitPose.transform.position.x} ${hitPose.transform.position.y} ${hitPose.transform.position.z}`);
+            tree.setAttribute('visible', true);
+            return;
+          }
+
+          // Place jungle gym second
+          if (!jungleGym.getAttribute('visible')) {
+            jungleGym.setAttribute('position', `${hitPose.transform.position.x + 1} ${hitPose.transform.position.y} ${hitPose.transform.position.z + 1}`);
+            jungleGym.setAttribute('visible', true);
+            return;
+          }
+
+          // Place flowers third
+          if (!flowers.getAttribute('visible')) {
+            flowers.setAttribute('position', `${hitPose.transform.position.x - 1} ${hitPose.transform.position.y} ${hitPose.transform.position.z + 1}`);
+            flowers.setAttribute('visible', true);
+            return;
+          }
         }
-
-        // Place the jungle gym at second tap
-        if (!jungleGym.getAttribute('visible')) {
-          jungleGym.setAttribute('position', `${hitPose.transform.position.x + 1} ${hitPose.transform.position.y} ${hitPose.transform.position.z + 1}`);
-          jungleGym.setAttribute('visible', true);
-          return;
-        }
-
-        // Place the flowers at third tap
-        if (!flowers.getAttribute('visible')) {
-          flowers.setAttribute('position', `${hitPose.transform.position.x - 1} ${hitPose.transform.position.y} ${hitPose.transform.position.z + 1}`);
-          flowers.setAttribute('visible', true);
-          return;
-        }
-      }
-    });
+      });
+    } else {
+      alert('WebXR not supported on this device/browser.');
+    }
   });
 </script>
 
