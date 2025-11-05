@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AR Garden Walkthrough</title>
+  <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
+</head>
+<body style="margin:0; overflow:hidden;">
+
+<a-scene
+  xr-mode-ui="enabled: true"
+  webxr="optionalFeatures: hit-test; referenceSpaceType: local-floor"
+  embedded
+>
+  <!-- Camera -->
+  <a-entity camera look-controls position="0 1.6 0"></a-entity>
+
+  <!-- 3D Models as empty entities to be positioned -->
+  <a-entity id="tree" gltf-model="tree.gltf" scale="0.5 0.5 0.5" visible="false"></a-entity>
+  <a-entity id="jungleGym" gltf-model="jungleGym.glb" scale="0.02 0.02 0.02" visible="false"></a-entity>
+  <a-entity id="flowers" gltf-model="flowers.glb" scale="0.05 0.05 0.05" visible="false"></a-entity>
+
+  <a-entity light="type: ambient; intensity: 1"></a-entity>
+  <a-entity light="type: directional; intensity: 0.6" position="0 1 1"></a-entity>
+
+</a-scene>
+
+<script>
+  const sceneEl = document.querySelector('a-scene');
+  const tree = document.querySelector('#tree');
+  const jungleGym = document.querySelector('#jungleGym');
+  const flowers = document.querySelector('#flowers');
+
+  let hitTestSource = null;
+  let localReferenceSpace = null;
+
+  sceneEl.addEventListener('enter-vr', async () => {
+    const xrSession = sceneEl.xrSession;
+    if (!xrSession) return;
+
+    localReferenceSpace = await xrSession.requestReferenceSpace('local-floor');
+    hitTestSource = await xrSession.requestHitTestSource({ space: localReferenceSpace });
+
+    // Listen for user tapping to place objects
+    xrSession.addEventListener('select', (event) => {
+      const hitResults = event.frame.getHitTestResults(hitTestSource);
+      if (hitResults.length > 0) {
+        const hitPose = hitResults[0].getPose(localReferenceSpace);
+
+        // Place the tree at first tap
+        if (!tree.getAttribute('visible')) {
+          tree.setAttribute('position', `${hitPose.transform.position.x} ${hitPose.transform.position.y} ${hitPose.transform.position.z}`);
+          tree.setAttribute('visible', true);
+          return;
+        }
+
+        // Place the jungle gym at second tap
+        if (!jungleGym.getAttribute('visible')) {
+          jungleGym.setAttribute('position', `${hitPose.transform.position.x + 1} ${hitPose.transform.position.y} ${hitPose.transform.position.z + 1}`);
+          jungleGym.setAttribute('visible', true);
+          return;
+        }
+
+        // Place the flowers at third tap
+        if (!flowers.getAttribute('visible')) {
+          flowers.setAttribute('position', `${hitPose.transform.position.x - 1} ${hitPose.transform.position.y} ${hitPose.transform.position.z + 1}`);
+          flowers.setAttribute('visible', true);
+          return;
+        }
+      }
+    });
+  });
+</script>
+
+</body>
+</html>
